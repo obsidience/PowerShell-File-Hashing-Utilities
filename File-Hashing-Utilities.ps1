@@ -8,6 +8,7 @@ function GenerateFolderHashes
         [Boolean] $UnhashedFoldersOnly
     )
 
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Gathering folder list..."
     $FolderList = Get-ChildItem $FolderName -Directory -Recurse |
         Where-Object { !$UnhashedFoldersOnly -or -not (Get-ChildItem $_.FullName -File -Force -Filter '.hashes.md5')} | 
         Sort-Object {Get-Random}
@@ -16,7 +17,7 @@ function GenerateFolderHashes
     {
         $Folder = $FolderList[$i]
 
-        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($(i) of $($FolderList.Length))"
+        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($($i) of $($FolderList.Length))"
         $FileHashes = @{}
 
         $FileList = Get-ChildItem $Folder -File
@@ -25,7 +26,7 @@ function GenerateFolderHashes
         {
             $File = $FileList[$j]
 
-            Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($(i) of $($FileList.Length))"
+            Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j) of $($FileList.Length))"
             $Hash = (Get-FileHash $File -Algorithm MD5)
             $FileHashes.Add($File, $Hash)
         }
