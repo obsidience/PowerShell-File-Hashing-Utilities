@@ -4,12 +4,16 @@
 function GenerateFolderHashes
 {
     param(
-        [String] $FolderName,
+        [String] $BaseFolderPath,
         [Boolean] $UnhashedFoldersOnly
     )
 
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes()"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedFoldersOnly: $UnhashedFoldersOnly"
+
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Gathering folder list..."
-    $FolderList = Get-ChildItem $FolderName -Directory -Recurse |
+    $FolderList = Get-ChildBaseItem $PatherName -Directory -Recurse |
         Where-Object { !$UnhashedFoldersOnly -or -not (Get-ChildItem $_.FullName -File -Force -Filter '.hashes.md5')} | 
         Sort-Object {Get-Random}
     
@@ -42,3 +46,29 @@ function GenerateFolderHashes
     }
 }
 
+function GetHashFiles
+{
+    param(
+        [String] $BaseFolderPath
+    )
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+
+    $HashFiles = Get-ChildItem $BaseFolderPath -File -Recurse -Include .hashes.md5
+    return $HashFiles
+}
+
+function VetFolderHashes
+{
+    param(
+        [String] $BaseFolderPath
+    )
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes()"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+
+    $HashFiles = GetHashFiles -BaseFolderPath $BaseFolderPath
+
+    Write-Host "..."
+}
