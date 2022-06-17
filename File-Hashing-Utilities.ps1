@@ -4,16 +4,16 @@
 function GenerateFolderHashes
 {
     param(
-        [String] $BaseFolderPath,
+        [String] $BaseFolderPaths,
         [Boolean] $UnhashedFoldersOnly
     )
 
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes()"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes() started..."
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedFoldersOnly: $UnhashedFoldersOnly"
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Gathering folder list..."
-    $FolderList = Get-ChildBaseItem $PatherName -Directory -Recurse |
+    $FolderList = Get-ChildItem $PatherName -Directory -Recurse |
         Where-Object { !$UnhashedFoldersOnly -or -not (Get-ChildItem $_.FullName -File -Force -Filter '.hashes.md5')} | 
         Sort-Object {Get-Random}
     
@@ -44,31 +44,45 @@ function GenerateFolderHashes
             Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Skipping..."
         }
     }
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes() finished!"
 }
 
 function GetHashFiles
 {
     param(
-        [String] $BaseFolderPath
+        [String[]] $BaseFolderPaths,
+        [String[]] $PathsToExclude
     )
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    PathsToExclude: $PathsToExclude"
 
-    $HashFiles = Get-ChildItem $BaseFolderPath -File -Recurse -Include .hashes.md5
+    $HashFiles = Get-ChildItem $BaseFolderPaths -File -Force -Recurse -Filter ".hashes.md5" -Exclude $PathsToExclude
     return $HashFiles
 }
 
 function VetFolderHashes
 {
     param(
-        [String] $BaseFolderPath
+        [String[]] $BaseFolderPaths,
+        [String[]] $PathsToExclude
     )
 
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes()"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPath: $BaseFolderPath"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() started..."
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    PathsToExclude: $PathsToExclude"
 
-    $HashFiles = GetHashFiles -BaseFolderPath $BaseFolderPath
+    $HashFiles = GetHashFiles -BaseFolderPaths $BaseFolderPaths -PathsToExclude $PathsToExclude
 
-    Write-Host "..."
+    for($i = 0; $i -lt $HashFiles.length; $i++)
+    {
+        $File = $HashFiles[$i]
+
+        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing file `"$($File.FullName)`"... ($($i) of $($HashFiles.Length))"
+        Write-Host "..."
+    }
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() finished!"
 }

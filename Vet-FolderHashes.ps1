@@ -1,5 +1,5 @@
 . ./File-Hashing-Utilities.ps1
 
-VetFolderHashes -BaseFolderPath '/mnt/storage/'
+VetFolderHashes -BaseFolderPaths @('/mnt/storage/') -PathsToExclude @('.plex')
 
 Write-Host "Done!"
