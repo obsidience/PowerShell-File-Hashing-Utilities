@@ -4,33 +4,35 @@
 function GenerateFolderHashes
 {
     param(
-        [String] $BaseFolderPaths,
-        [Boolean] $UnhashedFoldersOnly
+        [String[]] $BaseFolderPaths,
+        [String[]] $ExclusionCriteria,
+        [Boolean] $UnhashedOnly,
+        [Boolean] $Recurse
     )
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes() started..."
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedFoldersOnly: $UnhashedFoldersOnly"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Gathering folder list..."
-    $FolderList = Get-ChildItem $PatherName -Directory -Recurse |
-        Where-Object { !$UnhashedFoldersOnly -or -not (Get-ChildItem $_.FullName -File -Force -Filter '.hashes.md5')} | 
-        Sort-Object {Get-Random}
+    $FoldersToProcess = GetFoldersToProcess -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $UnhashedOnly -Recurse $Recurse
     
-    for($i = 0; $i -lt $FolderList.length; $i++)
+    for($i = 0; $i -lt $FoldersToProcess.Count; $i++)
     {
-        $Folder = $FolderList[$i]
+        $Folder = $FoldersToProcess[$i]
 
-        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($($i) of $($FolderList.Length))"
+        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($($i) of $($FoldersToProcess.Count))"
         $FileHashes = @{}
 
         $FileList = Get-ChildItem $Folder -File
 
-        for($j = 0; $j -lt $FileList.length; j++)
+        for($j = 0; $j -lt $FileList.Count; j++)
         {
             $File = $FileList[$j]
 
-            Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j) of $($FileList.Length))"
+            Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j) of $($FileList.Count))"
             $Hash = (Get-FileHash $File -Algorithm MD5)
             $FileHashes.Add($File, $Hash)
         }
@@ -48,41 +50,80 @@ function GenerateFolderHashes
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes() finished!"
 }
 
-function GetHashFiles
-{
-    param(
-        [String[]] $BaseFolderPaths,
-        [String[]] $PathsToExclude
-    )
-
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    PathsToExclude: $PathsToExclude"
-
-    $HashFiles = Get-ChildItem $BaseFolderPaths -File -Force -Recurse -Filter ".hashes.md5" -Exclude $PathsToExclude
-    return $HashFiles
-}
-
 function VetFolderHashes
 {
     param(
         [String[]] $BaseFolderPaths,
-        [String[]] $PathsToExclude
+        [String[]] $ExclusionCriteria
     )
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() started..."
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    PathsToExclude: $PathsToExclude"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 
-    $HashFiles = GetHashFiles -BaseFolderPaths $BaseFolderPaths -PathsToExclude $PathsToExclude
+    # step 1 - create hashes for folders that have yet to be hashed
+    #GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
+    # step ? - find invalid hashes, such as folders with no files
+    
+    # step 2 - verify existing hashes by processing the oldest first
 
-    for($i = 0; $i -lt $HashFiles.length; $i++)
-    {
-        $File = $HashFiles[$i]
+    # $HashFiles = GetHashFiles -BaseFolderPaths $BaseFolderPaths -ExclusionCriteria $ExclusionCriteria
 
-        Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing file `"$($File.FullName)`"... ($($i) of $($HashFiles.Length))"
-        Write-Host "..."
-    }
+    # for($i = 0; $i -lt $HashFiles.Count; $i++)
+    # {
+    #     $File = $HashFiles[$i]
+
+    #     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing file `"$($File.FullName)`"... ($($i) of $($HashFiles.Count))"
+    #     Write-Host "..."
+    # }
 
     Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() finished!"
+}
+
+function GetFoldersToProcess
+{
+    param(
+        [String[]] $BaseFolderPaths,
+        [String[]] $ExclusionCriteria,
+        [Boolean] $UnhashedOnly,
+        [Boolean] $Recurse
+    )
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() started..."
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
+
+    $FoldersToProcess = Get-ChildItem -Path $BaseFolderPaths -Directory -Recurse:$Recurse -Verbose |
+        Where-Object { 
+            ($_.FullName -notmatch $($ExclusionCriteria -join "|")) -and # folders that aren't excluded or inside excluded 
+            (!($UnhashedOnly) -or !(Get-ChildItem -Path $_.FullName -File -Force -Filter '.hashes.md5')) -and # only folders without hashes, unless the unhashedonly option is passed
+            ((Get-ChildItem -Path $_.FullName -File).Count -gt 0) # only folders with files in them
+            
+        } | 
+        Sort-Object {Get-Random}
+    
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() finished!"
+    return $FoldersToProcess
+}
+
+function GetHashFiles
+{
+    param(
+        [String[]] $BaseFolderPaths,
+        [String[]] $ExclusionCriteria
+    )
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+
+    $HashFiles = Get-ChildItem -Path $BaseFolderPaths -File -Force -Recurse -Filter ".hashes.md5" |
+        Where-Object { 
+            ($_.FullName -notmatch $($ExclusionCriteria -join "|")) # folders that aren't excluded or inside excluded 
+        }
+
+    Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles() finished!"
+    return $HashFiles
 }
