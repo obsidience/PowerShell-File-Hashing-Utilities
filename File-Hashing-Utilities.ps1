@@ -39,6 +39,8 @@ function GenerateFolderHashes
 		if($FileHashes.Count -gt 0)
 		{
 			$OutFilePath = "$($Folder.FullName)/.hashes.md5"
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Writing file `"$($OutFilePath)`"..."
+
 			$FileHashes.GetEnumerator() | 
 				Sort-Object {$_Key} | 
 				ForEach-Object {
@@ -94,6 +96,8 @@ function RefreshFolderHashes
 		if($RefreshNeeded)
 		{
 			$OutFilePath = "$($Folder.FullName)/.hashes.md5"
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Writing file `"$($OutFilePath)`"..."
+
 			$FileHashes.GetEnumerator() | 
 				Sort-Object {$_.Key} | 
 				ForEach-Object {
@@ -101,6 +105,7 @@ function RefreshFolderHashes
 				} | 
 				Out-File -FilePath $OutFilePath
 		}
+		else { Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashes good, skipping..." }
 	}
 
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VerifyFolderHashes() finished!"
