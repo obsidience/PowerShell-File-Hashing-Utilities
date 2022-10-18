@@ -63,10 +63,10 @@ function MaintainFolderHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 
 	# step 1 - find invalid hashes for folders with changes
-	#InvalidateHashesWithFolderChanges -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
+	InvalidateHashesWithFolderChanges -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
 
 	# step 2 - generate hashes for folders without them
-	#GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
+	GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
 	
 	# step 3 - vet and refresh all existing hashes
 	VetAndRefreshExistingHashes  -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
@@ -232,7 +232,8 @@ function GetHashFiles
 		#Select-Object -First 20 |
 		Where-Object { 
 			($_.FullName -notmatch $($ExclusionCriteria -join "|")) # folders that aren't excluded or inside excluded 
-		} 
+		} | 
+		Sort-Object {Get-Random}
 
 
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles() finished!"
