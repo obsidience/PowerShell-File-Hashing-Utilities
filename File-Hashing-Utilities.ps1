@@ -22,7 +22,7 @@ function GenerateFolderHashes
 	for($i = 0; $i -lt $FoldersToProcess.Count; $i++)
 	{
 		$Folder = $FoldersToProcess[$i]
-		$FileHashes = @{}
+		$Hashes = @{}
 		$Files = Get-ChildItem $Folder -File
 
 		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($($i + 1) of $($FoldersToProcess.Count))"
@@ -33,19 +33,15 @@ function GenerateFolderHashes
 
 			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j + 1) of $($Files.Count))"
 			$HashValue = (Get-FileHash $File -Algorithm MD5).Hash
-			$FileHashes.Add($File.Name, $HashValue)
+			$Hashes.Add($File.Name, $HashValue)
 		}
 
-		if($FileHashes.Count -gt 0)
+		if($Hashes.Count -gt 0)
 		{
 			$OutFilePath = "$($Folder.FullName)/.hashes.md5"
 			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Writing file `"$($OutFilePath)`"..."
 
-			$FileHashes.GetEnumerator() | 
-				Sort-Object {$_Key} | 
-				ForEach-Object {
-					$_.Value.ToUpper() + " *" + $_.Key
-				} | Out-File -FilePath $OutFilePath        
+			WriteHashFile -Hashes $Hashes -FilePath $OutFilePath
 		}
 		else {
 			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Skipping..."
@@ -55,7 +51,30 @@ function GenerateFolderHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GenerateFolderHashes() finished!"
 }
 
-function RefreshFolderHashes
+function MaintainFolderHashes
+{
+	param(
+		[String[]] $BaseFolderPaths,
+		[String[]] $ExclusionCriteria
+	)
+
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() started..."
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+
+	# step 1 - find invalid hashes for folders with changes
+	#InvalidateHashesWithFolderChanges -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
+
+	# step 2 - generate hashes for folders without them
+	#GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
+	
+	# step 3 - vet and refresh all existing hashes
+	VetAndRefreshExistingHashes  -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
+
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() finished!"
+}
+
+function VetAndRefreshExistingHashes
 {
 	param(
 		[String[]] $BaseFolderPaths,
@@ -68,50 +87,45 @@ function RefreshFolderHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
-	$HashesFilesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
+	$HashFilesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
 
-	for($i = 0; $i -lt $HashesFilesToProcess.Count; $i++)
+	for($i = 0; $i -lt $HashFilesToProcess.Count; $i++)
 	{
-		$HashFile = $HashesFilesToProcess[$i]
+		$HashFile = $HashFilesToProcess[$i]
 		$Folder = $HashFile.Directory
 		$Files = (Get-ChildItem -Path $("$($HashFile.DirectoryName)\\*") -File -Force -Exclude "*.md5")
-		$FileHashes = ParseHashFile $HashFile
+		$Hashes = ParseHashFile $HashFile
 		$RefreshNeeded = $false
 
-		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder.FullName)`"... ($($i + 1) of $($HashesFilesToProcess.Count))"
+		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Processing folder `"$($Folder.FullName)`"... ($($i + 1) of $($HashFilesToProcess.Count))"
 
 		for($j = 0; $j -lt $Files.Count; $j++)
 		{
 			$File = $Files[$j]
-			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j + 1) of $($Files.Count))"
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hashing file `"$($File.Name)`"... ($($j + 1) of $($Files.Count))"
 
 			$HashValue = (Get-FileHash $File -Algorithm MD5)
-			if($HashValue.Hash -ne $FileHashes[$File.Name])
+			if($HashValue.Hash -ne $Hashes[$File.Name])
 			{
 				$RefreshNeeded = $true
-				$FileHashes[$File.Name] = $HashValue.Hash
+				$Hashes[$File.Name] = $HashValue.Hash
 			}
 		}
 
 		if($RefreshNeeded)
 		{
 			$OutFilePath = "$($Folder.FullName)/.hashes.md5"
-			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Writing file `"$($OutFilePath)`"..."
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Writing file `"$($OutFilePath)`"..."
 
-			$FileHashes.GetEnumerator() | 
-				Sort-Object {$_.Key} | 
-				ForEach-Object {
-					$_.Value.ToUpper() + " *" + $_.Key
-				} | 
-				Out-File -FilePath $OutFilePath
+			WriteHashFile -Hashes $Hashes -FilePath $OutFilePath
 		}
-		else { Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashes good, skipping..." }
+		else { Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hashes good, skipping..." }
 	}
 
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VerifyFolderHashes() finished!"
 }
 
-function InvalidateBadHashes
+function InvalidateHashesWithFolderChanges
 {
 	param(
 		[String[]] $BaseFolderPaths,
@@ -119,68 +133,59 @@ function InvalidateBadHashes
 		[Boolean] $Recurse
 	)
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] InvalidateBadHashes() started..."
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] InvalidateHashesWithFolderChanges() started..."
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
-	$HashesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
+	$HashFilesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
 
-	for($i = 0; $i -lt $HashesToProcess.Count; $i++)
+	for($i = 0; $i -lt $HashFilesToProcess.Count; $i++)
 	{
-		$Hash = $HashesToProcess[$i]
+		$Hash = $HashFilesToProcess[$i]
 		$Folder = $Hash.DirectoryName
 		$Files = (Get-ChildItem -Path $("$Folder\\*") -File -Force -Exclude "*.md5")
-		$FileHashes = ParseHashFile $Hash
+		$Hashes = ParseHashFile $Hash
 		$IsBad = $false
 
-		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Processing folder `"$($Folder)`"... ($($i) of $($HashesToProcess.Count))"
+		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Processing folder `"$($Folder)`"... ($($i) of $($HashFilesToProcess.Count))"
 
 		# invalidate hashes with file count mismatch
-		if($FileHashes.Count -ne $Files.Count) { $IsBad = $true; }
+		if($Hashes.Count -ne $Files.Count) 
+		{ 
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       File count mismatch, invalidating hash..."
+			$IsBad = $true; 
+		}
 		else
 		{
 			foreach($File in $Files)
 			{
 				# invalidate hashes with files newer than the hash
-				if($File.LastWriteTime -gt $Hash.LastWriteTime) { $IsBad = $true; break; }
+				if($File.LastWriteTime -gt $Hash.LastWriteTime) 
+				{ 
+					Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       $($File) has been updated, invalidating hash..."
+					$IsBad = $true; 
+					break; 
+				}
 
 				# invalidate hashes with file name mismatch
-				if($FileHashes[$File.Name] -eq $null) { $IsBad = $true; break; }
+				if($Hashes[$File.Name] -eq $null)
+				{ 
+					Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       $($File) not found, invalidating hash..."
+					$IsBad = $true; 
+					break; 
+				}
 			}
 		}
 
 		if($IsBad)
 		{
-			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Removing bad hash file `"$($Hash.FullName)`"..."
-			Remove-Item -Path $Hash.FullName -Force -WhatIf
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Removing bad hash file `"$($Hash.FullName)`"..."
+			Remove-Item -Path $Hash.FullName -Force
 		}
 	}
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] InvalidateBadHashes() finished!"
-}
-
-function VetFolderHashes
-{
-	param(
-		[String[]] $BaseFolderPaths,
-		[String[]] $ExclusionCriteria
-	)
-
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() started..."
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
-
-	# step 1 - find invalid hashes without verifying hash
-	#InvalidateBadHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
-
-	# step 2 - create hashes for folders that have yet to be hashed
-	#GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
-	
-	# step 3 - vet and refresh all existing hashes
-	RefreshFolderHashes  -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
-
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VetFolderHashes() finished!"
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] InvalidateHashesWithFolderChanges() finished!"
 }
 
 function GetFoldersToProcess
@@ -192,11 +197,11 @@ function GetFoldersToProcess
 		[Boolean] $Recurse
 	)
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() started..."
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() started..."
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
 	$FoldersToProcess = Get-ChildItem -Path $BaseFolderPaths -Directory -Recurse:$Recurse -Verbose |
 		Where-Object { 
@@ -207,7 +212,7 @@ function GetFoldersToProcess
 		} | 
 		Sort-Object {Get-Random}
 	
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() finished!"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetFoldersToProcess() finished!"
 	return $FoldersToProcess
 }
 
@@ -219,18 +224,18 @@ function GetHashFiles
 		[Boolean] $Recurse
 	)
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles()"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 
 	$HashFiles = Get-ChildItem -Path $BaseFolderPaths -File -Force -Recurse:$Recurse -Filter ".hashes.md5" |
-		Select-Object -First 20 |
+		#Select-Object -First 20 |
 		Where-Object { 
 			($_.FullName -notmatch $($ExclusionCriteria -join "|")) # folders that aren't excluded or inside excluded 
 		} 
 
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles() finished!"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles() finished!"
 	return $HashFiles
 }
 
@@ -240,15 +245,36 @@ function ParseHashFile
 		[String] $HashFile
 	)
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] ParseHashFile() started..."
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    HashFile: $HashFile"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] ParseHashFile() started..."
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    HashFile: $HashFile"
 
-	$FileHashes = @{}
+	$Hashes = @{}
 	$(Get-Content $HashFile) | ForEach-Object {
 		$value, $key = ($_).Split(" *")
-		$FileHashes[$key] = $value
+		$Hashes[$key] = $value
 	}
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] ParseHashFile() finished!"
-	return $FileHashes
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] ParseHashFile() finished!"
+	return $Hashes
+}
+
+function WriteHashFile
+{
+	param(
+		[Hashtable] $Hashes,
+		[String] $FilePath
+	)
+
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] WriteHashFile()"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashes: $Hashes"
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    FilePath: $FilePath"
+
+	$Hashes.GetEnumerator() | 
+				Sort-Object {$_.Key} | 
+				ForEach-Object {
+					$_.Value.ToUpper() + " *" + $_.Key
+				} | 
+				Out-File -FilePath $OutFilePath
+
+	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] WriteHashFile() finished!"
 }
