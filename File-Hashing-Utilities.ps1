@@ -16,7 +16,7 @@ function GenerateFolderHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
-	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] Gathering folder list..."
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Gathering list of folders..."
 	$FoldersToProcess = GetFoldersToProcess -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $UnhashedOnly -Recurse $Recurse
 	
 	for($i = 0; $i -lt $FoldersToProcess.Count; $i++)
@@ -32,7 +32,7 @@ function GenerateFolderHashes
 			$File = $Files[$j]
 
 			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashing file `"$($File.Name)`"... ($($j + 1) of $($Files.Count))"
-			$HashValue = (Get-FileHash $File -Algorithm MD5).Hash
+			$HashValue = (Get-FileHash -LiteralPath $File -Algorithm MD5).Hash
 			$Hashes.Add($File.Name, $HashValue)
 		}
 
@@ -104,7 +104,7 @@ function VetAndRefreshExistingHashes
 			$File = $Files[$j]
 			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hashing file `"$($File.Name)`"... ($($j + 1) of $($Files.Count))"
 
-			$HashValue = (Get-FileHash $File -Algorithm MD5)
+			$HashValue = (Get-FileHash -LiteralPath $File -Algorithm MD5)
 			if($HashValue.Hash -ne $Hashes[$File.Name])
 			{
 				$RefreshNeeded = $true
@@ -138,6 +138,7 @@ function InvalidateHashesWithFolderChanges
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Gathering list of hash files..."
 	$HashFilesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
 
 	for($i = 0; $i -lt $HashFilesToProcess.Count; $i++)
@@ -270,9 +271,19 @@ function WriteHashFile
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Hashes: $Hashes"
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    FilePath: $FilePath"
 
+	# if($Hashes -eq $null -or $Hashes.Count -eq 0)
+	# {
+	# 	$x = 0;
+	# }
+
 	$Hashes.GetEnumerator() | 
 				Sort-Object {$_.Key} | 
 				ForEach-Object {
+					# if($_.Value -eq $null -or $_.Key -eq $null)
+					# {
+					# 	$x = 0;
+					# }
+
 					$_.Value.ToUpper() + " *" + $_.Key
 				} | 
 				Out-File -FilePath $OutFilePath
