@@ -149,7 +149,7 @@ function InvalidateHashesWithFolderChanges
 		$Hashes = ParseHashFile $Hash
 		$IsBad = $false
 
-		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Processing folder `"$($Folder)`"... ($($i) of $($HashFilesToProcess.Count))"
+		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Processing folder `"$($Folder)`"... ($($i + 1) of $($HashFilesToProcess.Count))"
 
 		# invalidate hashes with file count mismatch
 		if($Hashes.Count -ne $Files.Count) 
