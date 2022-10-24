@@ -107,6 +107,7 @@ function VetAndRefreshExistingHashes
 			$HashValue = (Get-FileHash -LiteralPath $File -Algorithm MD5)
 			if($HashValue.Hash -ne $Hashes[$File.Name])
 			{
+				Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hash is bad, hash file will be refreshed..."
 				$RefreshNeeded = $true
 				$Hashes[$File.Name] = $HashValue.Hash
 			}
