@@ -63,10 +63,10 @@ function MaintainFolderHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 
 	# step 1 - find invalid hashes for folders with changes
-	InvalidateHashesWithFolderChanges -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
+	#InvalidateHashesWithFolderChanges -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
 
 	# step 2 - generate hashes for folders without them
-	GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
+	#GenerateFolderHashes -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -UnhashedOnly $true -Recurse $true
 	
 	# step 3 - vet and refresh all existing hashes
 	VetAndRefreshExistingHashes  -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $true
@@ -87,6 +87,7 @@ function VetAndRefreshExistingHashes
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
+	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Gathering list of all hash files that need vetting..."
 	$HashFilesToProcess = GetHashFiles -BaseFolderPath @BaseFolderPaths -ExclusionCriteria $ExclusionCriteria -Recurse $Recurse
 
 	for($i = 0; $i -lt $HashFilesToProcess.Count; $i++)
@@ -98,6 +99,7 @@ function VetAndRefreshExistingHashes
 		$RefreshNeeded = $false
 
 		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Processing folder `"$($Folder.FullName)`"... ($($i + 1) of $($HashFilesToProcess.Count))"
+		Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Folder was last hashed on $($HashFile.LastWriteTime)."
 
 		for($j = 0; $j -lt $Files.Count; $j++)
 		{
@@ -107,7 +109,7 @@ function VetAndRefreshExistingHashes
 			$HashValue = (Get-FileHash -LiteralPath $File -Algorithm MD5)
 			if($HashValue.Hash -ne $Hashes[$File.Name])
 			{
-				Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hash is bad, hash file will be refreshed..."
+				Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hash is bad, hash file for this folder will be refreshed..."
 				$RefreshNeeded = $true
 				$Hashes[$File.Name] = $HashValue.Hash
 			}
@@ -120,7 +122,11 @@ function VetAndRefreshExistingHashes
 
 			WriteHashFile -Hashes $Hashes -FilePath $OutFilePath
 		}
-		else { Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hashes good, skipping..." }
+		else 
+		{ 
+			Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]       Hashes are good, updated hash file modified date and moving on..." 
+			$HashFile.LastWriteTime = (Get-Date)
+		}
 	}
 
 	Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] VerifyFolderHashes() finished!"
@@ -235,8 +241,7 @@ function GetHashFiles
 		Where-Object { 
 			($_.FullName -notmatch $($ExclusionCriteria -join "|")) # folders that aren't excluded or inside excluded 
 		} | 
-		Sort-Object {Get-Random}
-
+		Sort-Object LastWriteTime
 
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")] GetHashFiles() finished!"
 	return $HashFiles
