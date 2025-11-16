@@ -211,7 +211,7 @@ function GetFoldersToProcess
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    UnhashedOnly: $UnhashedOnly"
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    Recurse: $Recurse"
 
-	$FoldersToProcess = Get-ChildItem -Path $BaseFolderPaths -Directory -Recurse:$Recurse -Verbose |
+	$FoldersToProcess = Get-ChildItem -Path $BaseFolderPaths -Directory -Recurse:$Recurse -Verbose -ErrorAction SilentlyContinue |
 		Where-Object { 
 			($_.FullName -notmatch $($ExclusionCriteria -join "|")) -and # folders that aren't excluded or inside excluded 
 			(!($UnhashedOnly) -or !(Get-ChildItem -Path $_.FullName -File -Force -Filter '.hashes.md5')) -and # only folders without hashes, unless the unhashedonly option is passed
@@ -236,7 +236,7 @@ function GetHashFiles
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    BaseFolderPaths: $BaseFolderPaths"
 	# Write-Host "[$(Get-Date -format "yyyy-MM-dd HH:mm:ss")]    ExclusionCriteria: $ExclusionCriteria"
 
-	$HashFiles = Get-ChildItem -Path $BaseFolderPaths -File -Force -Recurse:$Recurse -Filter ".hashes.md5" |
+	$HashFiles = Get-ChildItem -Path $BaseFolderPaths -File -Force -Recurse:$Recurse -Filter ".hashes.md5" -ErrorAction SilentlyContinue |
 		#Select-Object -First 20 |
 		Where-Object { 
 			($_.FullName -notmatch $($ExclusionCriteria -join "|")) # folders that aren't excluded or inside excluded 
